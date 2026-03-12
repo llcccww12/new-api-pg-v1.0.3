@@ -65,7 +65,13 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
   const { mainNavLinks } = useNavigation(t, docsLink, headerNavModules);
 
   return (
-    <header className='text-semi-color-text-0 sticky top-0 z-50 transition-colors duration-300 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-lg'>
+    <header
+  className="text-semi-color-text-0 sticky top-0 z-50
+             bg-white/[0.95] dark:bg-zinc-900/[0.75]
+             backdrop-blur-[10px]
+             [box-shadow:0_4px_6px_-1px_rgba(0,0,0,0.06),0_2px_4px_-1px_rgba(0,0,0,0.04),0_1px_0_0_rgba(0,0,0,0.03)]
+             transition-[box-shadow,background-color] duration-300 ease-in-out"
+>
       <NoticeModal
         visible={noticeVisible}
         onClose={handleNoticeClose}
@@ -74,8 +80,8 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
         unreadKeys={getUnreadKeys()}
       />
 
-      <div className='w-full px-2'>
-        <div className='flex items-center justify-between h-16'>
+      <div className='w-full px-4 py-4'>
+        <div className='flex items-center justify-between h-18'>
           <div className='flex items-center'>
             <MobileMenuButton
               isConsoleRoute={isConsoleRoute}
@@ -99,6 +105,7 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
             />
           </div>
 
+
           <Navigation
             mainNavLinks={mainNavLinks}
             isMobile={isMobile}
@@ -106,6 +113,7 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
             userState={userState}
             pricingRequireAuth={pricingRequireAuth}
           />
+
 
           <ActionButtons
             isNewYear={isNewYear}

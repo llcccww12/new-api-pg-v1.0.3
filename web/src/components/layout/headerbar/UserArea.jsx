@@ -123,7 +123,7 @@ const UserArea = ({
           >
             <Avatar
               size='extra-small'
-              color={stringToColor(userState.user.username)}
+              color='#0084ca'
               className='mr-1'
             >
               {userState.user.username[0].toUpperCase()}

@@ -50,7 +50,7 @@ const ActionButtons = ({
         t={t}
       />
 
-      <ThemeToggle theme={theme} onThemeToggle={onThemeToggle} t={t} />
+      {/*<ThemeToggle theme={theme} onThemeToggle={onThemeToggle} t={t} />*/}
 
       <LanguageSelector
         currentLang={currentLang}

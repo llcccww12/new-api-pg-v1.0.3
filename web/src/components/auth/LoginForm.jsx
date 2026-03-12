@@ -947,7 +947,10 @@ const LoginForm = () => {
   };
 
   return (
-    <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8'>
+    // <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8'>
+      <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8  min-h-[calc(100vh-74px)]'
+      style={{ backgroundImage: "url('/sjwy_bg.png')", backgroundSize: '3000px' }}
+      >
       {/* 背景模糊晕染球 */}
       <div
         className='blur-ball blur-ball-indigo'

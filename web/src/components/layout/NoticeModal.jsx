@@ -217,7 +217,7 @@ const NoticeModal = ({
             <TabPane
               tab={
                 <span className='flex items-center gap-1'>
-                  <Bell size={14} /> {t('通知')}
+                  <Bell size={14} /> {t('通知1')}
                 </span>
               }
               itemKey='inApp'

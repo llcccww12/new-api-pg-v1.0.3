@@ -38,8 +38,8 @@ const HeaderLogo = ({
   }
 
   return (
-    <Link to='/' className='group flex items-center gap-2'>
-      <div className='relative w-8 h-8 md:w-8 md:h-8'>
+      <Link to='/' className='group flex items-center gap-2'>
+        {/*<div className='relative w-8 h-8 md:w-8 md:h-8'>
         <SkeletonWrapper loading={isLoading || !logoLoaded} type='image' />
         <img
           src={logo}
@@ -73,8 +73,13 @@ const HeaderLogo = ({
             </Tag>
           )}
         </div>
-      </div>
-    </Link>
+      </div>*/}
+
+        {(<img 
+            className="w-[120px] h-auto ml-8"
+            src="https://omo-oss-image.thefastimg.com/portal-saas/pg2024111113265937237/cms/image/453ec7e6-4f19-4314-b938-15cfd4e3bae0.png"
+            alt="logo"/>)}
+      </Link>
   );
 };
 

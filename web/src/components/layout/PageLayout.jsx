@@ -214,6 +214,15 @@ const PageLayout = () => {
               WebkitOverflowScrolling: 'touch',
               padding: shouldInnerPadding ? (isMobile ? '5px' : '24px') : '0',
               position: 'relative',
+
+              ...(isConsoleRoute
+                ? {
+                    backgroundImage: "url('/sjwy_bg.png')",
+                    backgroundSize: '3000px',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                  }
+                : {}),
             }}
           >
             <App />

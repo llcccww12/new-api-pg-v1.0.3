@@ -16,7 +16,8 @@ version: '3.4' # For compatibility with older Docker versions
 
 services:
   new-api:
-    image: calciumion/new-api:latest
+#    image: calciumion/new-api:latest
+    build: .  # 使用当前目录下的 Dockerfile 构建镜像
     container_name: new-api
     restart: always
     command: --log-dir /app/logs

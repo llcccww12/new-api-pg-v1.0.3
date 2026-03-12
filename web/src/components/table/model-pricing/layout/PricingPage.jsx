@@ -40,7 +40,8 @@ const PricingPage = () => {
   };
 
   return (
-    <div className='bg-white'>
+    <div className='w-full overflow-x-hidden bg-cover bg-center bg-no-repeat'
+    style={{ backgroundImage: "url('/sjwy_bg.png')", backgroundSize: '3000px' }}>
       <Layout className='pricing-layout'>
         {!isMobile && (
           <Sider className='pricing-scroll-hide pricing-sidebar'>

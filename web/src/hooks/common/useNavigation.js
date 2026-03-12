@@ -52,17 +52,18 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
       ...(docsLink
         ? [
             {
-              text: t('文档'),
+              text: t('产品说明'),
               itemKey: 'docs',
               isExternal: true,
-              externalLink: docsLink,
+              externalLink: 'https://www.century-albert.com/Case/1.html',
             },
           ]
         : []),
       {
-        text: t('关于'),
+        text: t('关于我们'),
         itemKey: 'about',
-        to: '/about',
+        isExternal: true,
+        externalLink: 'https://www.century-albert.com/',
       },
     ];
 
