@@ -2,7 +2,7 @@
 
 set -e
 
-echo "Building Century Albert Electron App..."
+echo "Building PrimeGenius Electron App..."
 
 echo "Step 1: Building frontend..."
 cd ../web

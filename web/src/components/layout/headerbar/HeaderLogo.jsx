@@ -77,7 +77,7 @@ const HeaderLogo = ({
 
         {(<img 
             className="w-[120px] h-auto ml-8"
-            src="https://omo-oss-image.thefastimg.com/portal-saas/pg2024111113265937237/cms/image/453ec7e6-4f19-4314-b938-15cfd4e3bae0.png"
+            src="/logo-w.png"
             alt="logo"/>)}
       </Link>
   );

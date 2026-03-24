@@ -377,10 +377,10 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	snap := task.Snapshot()
 
 	taskResult := &relaycommon.TaskInfo{}
-	// try parse as Century Albert response format
+	// try parse as PrimeGenius response format
 	var responseItems dto.TaskResponse[model.Task]
 	if err = common.Unmarshal(responseBody, &responseItems); err == nil && responseItems.IsSuccess() {
-		logger.LogDebug(ctx, fmt.Sprintf("updateVideoSingleTask parsed as Century Albert response format: %+v", responseItems))
+		logger.LogDebug(ctx, fmt.Sprintf("updateVideoSingleTask parsed as PrimeGenius response format: %+v", responseItems))
 		t := responseItems.Data
 		taskResult.TaskID = t.TaskID
 		taskResult.Status = string(t.Status)

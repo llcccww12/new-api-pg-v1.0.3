@@ -49,7 +49,7 @@ func main() {
 		return
 	}
 
-	common.SysLog("Century Albert " + common.Version + " started")
+	common.SysLog("PrimeGenius " + common.Version + " started")
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)
 	}

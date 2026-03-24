@@ -907,10 +907,10 @@ html.dark .with-pastel-balls::before {
 .pricing-search-header {
   padding: 0.5rem;
   /*background-color: var(--semi-color-bg-0);*/
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  /*flex-shrink: 0;*/
+  /*position: sticky;*/
+  /*top: 0;*/
+  /*z-index: 5;*/
 }
 
 .pricing-view-container {
@@ -976,6 +976,6 @@ html.dark .with-pastel-balls::before {
 }
 
 
-.semi-card {
-  background-color: rgba(255, 255, 255, 0.2) !important;
+.semi-layout-footer{
+  display: none!important;
 }

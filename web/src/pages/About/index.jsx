@@ -62,7 +62,7 @@ const About = () => {
   const customDescription = (
     <div style={{ textAlign: 'center' }}>
       <p>{t('可在设置页面设置关于内容，支持 HTML & Markdown')}</p>
-      {t('Century Albert项目仓库地址：')}
+      {t('PrimeGenius项目仓库地址：')}
       <a
         href='https://github.com/QuantumNous/new-api'
         target='_blank'

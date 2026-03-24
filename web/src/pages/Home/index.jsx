@@ -166,7 +166,7 @@ const Home = () => {
             <div className='blur-ball blur-ball-teal' />
             <div className='flex items-center justify-center h-full px-4 py-20 md:py-24 lg:py-32 mt-10'>
               {/* 居中内容区 */}
-              <div className='flex flex-col items-center justify-center text-center max-w-4xl mx-auto'>
+              <div className='flex flex-col items-center justify-center text-center max-w-5xl mx-auto'>
                 <div className='flex flex-col items-center justify-center mb-6 md:mb-8'>
                   <h1
                     // className={`text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-semi-color-text-0 leading-tight ${isChinese ? 'tracking-wide md:tracking-wider' : ''}`}
@@ -176,12 +176,13 @@ const Home = () => {
                       {/* {t('统一的')}
                       <br />*/}
                       <br/>
-                      <span className='shine-text'>{t('统一大模型接口网关')}</span>
+                      <br/>
+                      <span className='shine-text'>{t('一站式全球AI大模型统一接入平台')}</span>
                     </>
                   </h1>
                   <p className='text-base md:text-lg lg:text-xl text-semi-color-text-1 mt-4 md:mt-6 max-w-xl'>
                     {/*{t('更好的价格，更好的稳定性，只需要将模型基址替换为：')}*/}
-                    {t('价稳双全，值得信赖，海量主流大模型一键接入：')}
+                    {t('更稳、更快、更省心')}
                   </p>
                   {/* BASE URL 与端点选择 */}
                   <div className='flex flex-col md:flex-row items-center justify-center gap-4 w-full mt-4 md:mt-6 max-w-md'>
@@ -264,7 +265,7 @@ const Home = () => {
                       type='tertiary'
                       className='text-lg md:text-xl lg:text-2xl font-light'
                     >
-                      {t('支持国内外主流大模型供应商')}
+                      {t('海量主流大模型一键接入')}
                     </Text>
                   </div>
                   <div className='flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 lg:gap-8 max-w-5xl mx-auto px-4'>

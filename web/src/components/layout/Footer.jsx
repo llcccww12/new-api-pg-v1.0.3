@@ -207,7 +207,7 @@ const FooterBar = () => {
               rel='全国互联网安全管理服务平台'
               className='!text-semi-color-primary font-medium'
             >
-             {/* Century Albert*/}
+             {/* PrimeGenius*/}
             </a>
           </div>
         </div>
@@ -236,7 +236,7 @@ const FooterBar = () => {
               rel='世纪伟业官网'
               className='!text-semi-color-primary font-medium'
             >
-              Century Albert
+              PrimeGenius
             </a>
           </div>
         </div>
