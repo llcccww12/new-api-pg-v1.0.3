@@ -113,8 +113,11 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		requestBody = common.ReaderOnly(storage)
 		// passthrough 路径下也要让 adaptor 拿到转换结果，否则 /v1/chat/completions 走 AWS 渠道时
 		// doAwsClientRequest 不会拿到 *dto.ClaudeRequest，强转结果丢失，导致 Bedrock 报 max_tokens 缺失。
-		if _, cErr := adaptor.ConvertOpenAIRequest(c, info, request); cErr != nil {
-			return types.NewError(cErr, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+		// 仅 AWS 渠道需要这个预转换，其他渠道（OpenAI/Azure/Gemini）a.AwsReq 不会被读，无谓调用浪费。
+		if info.ApiType == constant.ChannelTypeAws {
+			if _, cErr := adaptor.ConvertOpenAIRequest(c, info, request); cErr != nil {
+				return types.NewError(cErr, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+			}
 		}
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
