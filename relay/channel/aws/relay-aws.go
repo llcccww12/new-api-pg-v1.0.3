@@ -115,6 +115,7 @@ func doAwsClientRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor,
 		requestHeader.Set(key, value)
 	}
 
+
 	if isNovaModel(awsModelId) {
 		var novaReq *NovaRequest
 		err = common.DecodeJson(requestBody, &novaReq)
@@ -139,33 +140,49 @@ func doAwsClientRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor,
 	} else if claudeReq, ok := a.AwsReq.(*dto.ClaudeRequest); ok && claudeReq != nil {
 		// /v1/chat/completions 入口：ConvertOpenAIRequest 已把 OpenAI 请求转成 *dto.ClaudeRequest
 		// 并暂存在 a.AwsReq 上。直接复用，避免把原始 OpenAI body 喂给 formatRequest 解析失败。
-		// ConvertOpenAIRequest 已经处理了 max_tokens 兜底和 anthropic_version 注入路径，
-		// 这里只要把 *dto.ClaudeRequest 喂给 buildAwsRequestBody 即可。
-		if info.IsStream {
-			awsReq := &bedrockruntime.InvokeModelWithResponseStreamInput{
-				ModelId:     aws.String(awsModelId),
-				Accept:      aws.String("application/json"),
-				ContentType: aws.String("application/json"),
-			}
-			awsReq.Body, err = buildAwsRequestBody(c, info, claudeReq)
-			if err != nil {
-				return nil, types.NewError(errors.Wrap(err, "marshal aws request fail"), types.ErrorCodeBadRequestBody)
-			}
-			a.AwsReq = awsReq
-			return nil, nil
-		} else {
-			awsReq := &bedrockruntime.InvokeModelInput{
-				ModelId:     aws.String(awsModelId),
-				Accept:      aws.String("application/json"),
-				ContentType: aws.String("application/json"),
-			}
-			awsReq.Body, err = buildAwsRequestBody(c, info, claudeReq)
-			if err != nil {
-				return nil, types.NewError(errors.Wrap(err, "marshal aws request fail"), types.ErrorCodeBadRequestBody)
-			}
-			a.AwsReq = awsReq
-			return nil, nil
+		// 注意：不能走 buildAwsRequestBody，它的 passthrough 分支会读 c.Request.Body（即 OpenAI 原始 body），
+		// 会丢失 max_tokens 兜底等转换结果，导致 Bedrock 报 400 "max_tokens: Field required"。
+		// 这里直接 marshal 转换后的 ClaudeRequest，并补 Bedrock 必需字段。
+		if claudeReq.MaxTokens == nil {
+			claudeReq.MaxTokens = common.GetPointer[uint](4096)
 		}
+		for i := range claudeReq.Messages {
+			claudeReq.Messages[i].Content = removeCacheControl(claudeReq.Messages[i].Content)
+		}
+		if claudeReq.System != nil {
+			claudeReq.System = removeCacheControl(claudeReq.System)
+		}
+		// dto.ClaudeRequest 没有 anthropic_version 字段（Bedrock 必需），
+		// 先 marshal 成 map 再注入 anthropic_version，确保 Bedrock 不会报 "anthropic_version: Field required"。
+		rawJSON, mErr0 := common.Marshal(claudeReq)
+		if mErr0 != nil {
+			return nil, types.NewError(errors.Wrap(mErr0, "marshal claude request fail"), types.ErrorCodeBadRequestBody)
+		}
+		var bodyMap map[string]any
+		if uErr := common.Unmarshal(rawJSON, &bodyMap); uErr != nil {
+			return nil, types.NewError(errors.Wrap(uErr, "unmarshal claude request fail"), types.ErrorCodeBadRequestBody)
+		}
+		bodyMap["anthropic_version"] = "bedrock-2023-05-31"
+		body, mErr := common.Marshal(bodyMap)
+		if mErr != nil {
+			return nil, types.NewError(errors.Wrap(mErr, "marshal claude request fail"), types.ErrorCodeBadRequestBody)
+		}
+		if info.IsStream {
+			a.AwsReq = &bedrockruntime.InvokeModelWithResponseStreamInput{
+				ModelId:     aws.String(awsModelId),
+				Accept:      aws.String("application/json"),
+				ContentType: aws.String("application/json"),
+				Body:        body,
+			}
+		} else {
+			a.AwsReq = &bedrockruntime.InvokeModelInput{
+				ModelId:     aws.String(awsModelId),
+				Accept:      aws.String("application/json"),
+				ContentType: aws.String("application/json"),
+				Body:        body,
+			}
+		}
+		return nil, nil
 	} else {
 		awsClaudeReq, err := formatRequest(requestBody, requestHeader)
 		if err != nil {

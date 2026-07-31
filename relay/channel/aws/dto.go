@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
@@ -13,7 +12,6 @@ import (
 )
 
 type AwsClaudeRequest struct {
-	// AnthropicVersion should be "bedrock-2023-05-31"
 	AnthropicVersion string              `json:"anthropic_version"`
 	AnthropicBeta    json.RawMessage     `json:"anthropic_beta,omitempty"`
 	System           any                 `json:"system,omitempty"`
@@ -27,7 +25,22 @@ type AwsClaudeRequest struct {
 	ToolChoice       any                 `json:"tool_choice,omitempty"`
 	Thinking         *dto.Thinking       `json:"thinking,omitempty"`
 	OutputConfig     json.RawMessage     `json:"output_config,omitempty"`
-	//Metadata         json.RawMessage     `json:"metadata,omitempty"`
+}
+
+func removeCacheControl(content any) any {
+	switch v := content.(type) {
+	case []interface{}:
+		for _, item := range v {
+			if m, ok := item.(map[string]interface{}); ok {
+				delete(m, "cache_control")
+			}
+		}
+	case []map[string]interface{}:
+		for _, m := range v {
+			delete(m, "cache_control")
+		}
+	}
+	return content
 }
 
 func formatRequest(requestBody io.Reader, requestHeader http.Header) (*AwsClaudeRequest, error) {
@@ -38,24 +51,23 @@ func formatRequest(requestBody io.Reader, requestHeader http.Header) (*AwsClaude
 	}
 	awsClaudeRequest.AnthropicVersion = "bedrock-2023-05-31"
 
-	// check header anthropic-beta
-	anthropicBetaValues := requestHeader.Get("anthropic-beta")
-	if len(anthropicBetaValues) > 0 {
-		var tempArray []string
-		tempArray = strings.Split(anthropicBetaValues, ",")
-		if len(tempArray) > 0 {
-			betaJson, err := json.Marshal(tempArray)
-			if err != nil {
-				return nil, err
-			}
-			awsClaudeRequest.AnthropicBeta = betaJson
-		}
+	// Bedrock 要求 max_tokens 必填：OpenAI 格式(/v1/chat/completions)请求里该字段可选，
+	// 转换后可能为 0 被 omitempty 丢弃，这里兜底补默认值，避免 400 "max_tokens: Field required"
+	if awsClaudeRequest.MaxTokens == 0 {
+		awsClaudeRequest.MaxTokens = 4096
 	}
+
+	for i := range awsClaudeRequest.Messages {
+		awsClaudeRequest.Messages[i].Content = removeCacheControl(awsClaudeRequest.Messages[i].Content)
+	}
+	if awsClaudeRequest.System != nil {
+		awsClaudeRequest.System = removeCacheControl(awsClaudeRequest.System)
+	}
+	awsClaudeRequest.AnthropicBeta = nil
 	logger.LogJson(context.Background(), "json", awsClaudeRequest)
 	return &awsClaudeRequest, nil
 }
 
-// NovaMessage Nova模型使用messages-v1格式
 type NovaMessage struct {
 	Role    string        `json:"role"`
 	Content []NovaContent `json:"content"`
@@ -66,20 +78,19 @@ type NovaContent struct {
 }
 
 type NovaRequest struct {
-	SchemaVersion   string               `json:"schemaVersion"`             // 请求版本，例如 "1.0"
-	Messages        []NovaMessage        `json:"messages"`                  // 对话消息列表
-	InferenceConfig *NovaInferenceConfig `json:"inferenceConfig,omitempty"` // 推理配置，可选
+	SchemaVersion   string               `json:"schemaVersion"`
+	Messages        []NovaMessage        `json:"messages"`
+	InferenceConfig *NovaInferenceConfig `json:"inferenceConfig,omitempty"`
 }
 
 type NovaInferenceConfig struct {
-	MaxTokens     int      `json:"maxTokens,omitempty"`     // 最大生成的 token 数
-	Temperature   float64  `json:"temperature,omitempty"`   // 随机性 (默认 0.7, 范围 0-1)
-	TopP          float64  `json:"topP,omitempty"`          // nucleus sampling (默认 0.9, 范围 0-1)
-	TopK          int      `json:"topK,omitempty"`          // 限制候选 token 数 (默认 50, 范围 0-128)
-	StopSequences []string `json:"stopSequences,omitempty"` // 停止生成的序列
+	MaxTokens     int      `json:"maxTokens,omitempty"`
+	Temperature   float64  `json:"temperature,omitempty"`
+	TopP          float64  `json:"topP,omitempty"`
+	TopK          int      `json:"topK,omitempty"`
+	StopSequences []string `json:"stopSequences,omitempty"`
 }
 
-// 转换OpenAI请求为Nova格式
 func convertToNovaRequest(req *dto.GeneralOpenAIRequest) *NovaRequest {
 	novaMessages := make([]NovaMessage, len(req.Messages))
 	for i, msg := range req.Messages {
@@ -88,13 +99,10 @@ func convertToNovaRequest(req *dto.GeneralOpenAIRequest) *NovaRequest {
 			Content: []NovaContent{{Text: msg.StringContent()}},
 		}
 	}
-
 	novaReq := &NovaRequest{
 		SchemaVersion: "messages-v1",
 		Messages:      novaMessages,
 	}
-
-	// 设置推理配置
 	if (req.MaxTokens != nil && *req.MaxTokens != 0) || (req.Temperature != nil && *req.Temperature != 0) || (req.TopP != nil && *req.TopP != 0) || (req.TopK != nil && *req.TopK != 0) || req.Stop != nil {
 		novaReq.InferenceConfig = &NovaInferenceConfig{}
 		if req.MaxTokens != nil && *req.MaxTokens != 0 {
@@ -115,16 +123,13 @@ func convertToNovaRequest(req *dto.GeneralOpenAIRequest) *NovaRequest {
 			}
 		}
 	}
-
 	return novaReq
 }
 
-// parseStopSequences 解析停止序列，支持字符串或字符串数组
 func parseStopSequences(stop any) []string {
 	if stop == nil {
 		return nil
 	}
-
 	switch v := stop.(type) {
 	case string:
 		if v != "" {
