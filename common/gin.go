@@ -67,7 +67,6 @@ func GetRequestBody(c *gin.Context) (io.Seeker, error) {
 
 	// 使用新的存储系统
 	storage, err := CreateBodyStorageFromReader(c.Request.Body, contentLength, maxBytes)
-	_ = c.Request.Body.Close()
 
 	if err != nil {
 		if IsRequestBodyTooLargeError(err) {
