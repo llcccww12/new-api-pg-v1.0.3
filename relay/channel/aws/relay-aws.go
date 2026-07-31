@@ -136,6 +136,36 @@ func doAwsClientRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor,
 		awsReq.Body = reqBody
 		a.AwsReq = awsReq
 		return nil, nil
+	} else if claudeReq, ok := a.AwsReq.(*dto.ClaudeRequest); ok && claudeReq != nil {
+		// /v1/chat/completions 入口：ConvertOpenAIRequest 已把 OpenAI 请求转成 *dto.ClaudeRequest
+		// 并暂存在 a.AwsReq 上。直接复用，避免把原始 OpenAI body 喂给 formatRequest 解析失败。
+		// ConvertOpenAIRequest 已经处理了 max_tokens 兜底和 anthropic_version 注入路径，
+		// 这里只要把 *dto.ClaudeRequest 喂给 buildAwsRequestBody 即可。
+		if info.IsStream {
+			awsReq := &bedrockruntime.InvokeModelWithResponseStreamInput{
+				ModelId:     aws.String(awsModelId),
+				Accept:      aws.String("application/json"),
+				ContentType: aws.String("application/json"),
+			}
+			awsReq.Body, err = buildAwsRequestBody(c, info, claudeReq)
+			if err != nil {
+				return nil, types.NewError(errors.Wrap(err, "marshal aws request fail"), types.ErrorCodeBadRequestBody)
+			}
+			a.AwsReq = awsReq
+			return nil, nil
+		} else {
+			awsReq := &bedrockruntime.InvokeModelInput{
+				ModelId:     aws.String(awsModelId),
+				Accept:      aws.String("application/json"),
+				ContentType: aws.String("application/json"),
+			}
+			awsReq.Body, err = buildAwsRequestBody(c, info, claudeReq)
+			if err != nil {
+				return nil, types.NewError(errors.Wrap(err, "marshal aws request fail"), types.ErrorCodeBadRequestBody)
+			}
+			a.AwsReq = awsReq
+			return nil, nil
+		}
 	} else {
 		awsClaudeReq, err := formatRequest(requestBody, requestHeader)
 		if err != nil {
@@ -187,6 +217,9 @@ func buildAwsRequestBody(c *gin.Context, info *relaycommon.RelayInfo, awsClaudeR
 		}
 		delete(data, "model")
 		delete(data, "stream")
+		if _, ok := data["anthropic_version"]; !ok {
+			data["anthropic_version"] = "bedrock-2023-05-31"
+		}
 		return common.Marshal(data)
 	}
 	return common.Marshal(awsClaudeReq)

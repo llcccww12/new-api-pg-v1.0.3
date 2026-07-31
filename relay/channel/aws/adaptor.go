@@ -128,6 +128,10 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		return nil, errors.Wrap(err, "failed to convert openai request to claude request")
 	}
 	info.UpstreamModelName = claudeReq.Model
+	// 把已转换好的 ClaudeRequest 暂存到 adaptor 上，供 doAwsClientRequest 复用：
+	// /v1/chat/completions 入口下，强转结果不再丢，避免 doAwsClientRequest 重新解析
+	// 原始 OpenAI body 时报 400。
+	a.AwsReq = claudeReq
 	return claudeReq, err
 }
 
