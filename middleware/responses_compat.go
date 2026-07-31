@@ -44,6 +44,18 @@ func ResponsesCompatToChatCompletions() gin.HandlerFunc {
 			return
 		}
 		if _, hasMessages := probe["messages"]; hasMessages {
+			// Body is already in Chat Completions shape. Still need to flatten
+			// content parts arrays ("[{type:text,text:...}, ...]") into
+			// plain strings, otherwise the upstream GeneralOpenAIRequest
+			// fails to unmarshal content and returns "unexpected end of
+			// JSON input".
+			flattened, ok := flattenChatContentParts(body)
+			if !ok {
+				c.Next()
+				return
+			}
+			c.Request.Body = io.NopCloser(bytes.NewReader(flattened))
+			c.Request.ContentLength = int64(len(flattened))
 			c.Next()
 			return
 		}
@@ -247,6 +259,70 @@ func extractResponsesContent(content json.RawMessage) string {
 		return out
 	}
 	return string(content)
+}
+
+// flattenChatContentParts converts OpenAI content-parts arrays
+// ("content": [{"type":"text","text":"..."}]) into plain strings, which
+// is what new-api's GeneralOpenAIRequest.Content field expects.
+func flattenChatContentParts(body []byte) ([]byte, bool) {
+	var src map[string]json.RawMessage
+	if err := json.Unmarshal(body, &src); err != nil {
+		return nil, false
+	}
+	rawMessages, ok := src["messages"]
+	if !ok {
+		return body, true
+	}
+	var msgs []map[string]json.RawMessage
+	if err := json.Unmarshal(rawMessages, &msgs); err != nil {
+		return nil, false
+	}
+	changed := false
+	for i, m := range msgs {
+		contentRaw, hasContent := m["content"]
+		if !hasContent {
+			continue
+		}
+		var arr []map[string]any
+		if err := json.Unmarshal(contentRaw, &arr); err != nil {
+			// already a string, leave alone
+			continue
+		}
+		var text string
+		for _, p := range arr {
+			t, _ := p["type"].(string)
+			if t == "text" || t == "input_text" {
+				if s, ok := p["text"].(string); ok {
+					if text != "" {
+						text += "\n"
+					}
+					text += s
+				}
+			}
+		}
+		if text == "" {
+			continue
+		}
+		b, err := json.Marshal(text)
+		if err != nil {
+			continue
+		}
+		msgs[i]["content"] = b
+		changed = true
+	}
+	if !changed {
+		return body, true
+	}
+	updated, err := json.Marshal(msgs)
+	if err != nil {
+		return nil, false
+	}
+	src["messages"] = updated
+	out, err := json.Marshal(src)
+	if err != nil {
+		return nil, false
+	}
+	return out, true
 }
 
 func convertResponsesTools(tools json.RawMessage) (json.RawMessage, bool) {
