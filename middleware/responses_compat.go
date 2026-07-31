@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -147,25 +148,53 @@ func convertResponsesInput(input json.RawMessage) (json.RawMessage, bool) {
 		}
 		switch item.Type {
 		case "function_call_output":
+			// Responses API stores output as a JSON-encoded string. Unquote
+			// first so tool_result.content is a real JSON value.
 			outputStr := string(item.Output)
+			if unq, err := strconv.Unquote(outputStr); err == nil {
+				outputStr = unq
+			}
 			if len(outputStr) == 0 {
 				outputStr = "{}"
 			}
+			toolResultBlock := map[string]any{
+				"type":        "tool_result",
+				"tool_use_id": item.CallID,
+				"content":     outputStr,
+			}
+			// Bedrock requires user messages to contain at least one text block
+			// (whitespace-only text is rejected), so wrap the tool_result with
+			// a leading "Result:" text block.
 			messages = append(messages, map[string]any{
-				"role":         "tool",
-				"tool_call_id": item.CallID,
-				"content":      outputStr,
+				"role": "user",
+				"content": []any{
+					map[string]any{"type": "text", "text": "Result:"},
+					toolResultBlock,
+				},
 			})
 		case "function_call":
-			tc := map[string]any{
-				"id":       item.CallID,
-				"type":     "function",
-				"function": map[string]any{"name": item.Name, "arguments": string(item.Arguments)},
+			// Responses API stores arguments as a JSON-encoded string. Unquote
+			// then parse to a map so Bedrock receives tool_use.input as an
+			// object (required) rather than a string.
+			var inputObj map[string]any
+			rawArgs, err := strconv.Unquote(string(item.Arguments))
+			if err != nil {
+				rawArgs = string(item.Arguments)
+			}
+			if uErr := json.Unmarshal([]byte(rawArgs), &inputObj); uErr != nil {
+				inputObj = map[string]any{"raw": rawArgs}
+			}
+			// Emit an Anthropic-style assistant message with tool_use block so
+			// the upstream Chat->Claude translator passes it through.
+			toolUseBlock := map[string]any{
+				"type":  "tool_use",
+				"id":    item.CallID,
+				"name":  item.Name,
+				"input": inputObj,
 			}
 			messages = append(messages, map[string]any{
-				"role":       "assistant",
-				"content":    "",
-				"tool_calls": []any{tc},
+				"role":    "assistant",
+				"content": []map[string]any{toolUseBlock},
 			})
 		case "message":
 			contentStr := extractResponsesContent(item.Content)
