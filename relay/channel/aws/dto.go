@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"io"
 	"net/http"
 
@@ -27,22 +28,6 @@ type AwsClaudeRequest struct {
 	OutputConfig     json.RawMessage     `json:"output_config,omitempty"`
 }
 
-func removeCacheControl(content any) any {
-	switch v := content.(type) {
-	case []interface{}:
-		for _, item := range v {
-			if m, ok := item.(map[string]interface{}); ok {
-				delete(m, "cache_control")
-			}
-		}
-	case []map[string]interface{}:
-		for _, m := range v {
-			delete(m, "cache_control")
-		}
-	}
-	return content
-}
-
 func formatRequest(requestBody io.Reader, requestHeader http.Header) (*AwsClaudeRequest, error) {
 	var awsClaudeRequest AwsClaudeRequest
 	err := common.DecodeJson(requestBody, &awsClaudeRequest)
@@ -51,23 +36,89 @@ func formatRequest(requestBody io.Reader, requestHeader http.Header) (*AwsClaude
 	}
 	awsClaudeRequest.AnthropicVersion = "bedrock-2023-05-31"
 
-	// Bedrock 要求 max_tokens 必填：OpenAI 格式(/v1/chat/completions)请求里该字段可选，
-	// 转换后可能为 0 被 omitempty 丢弃，这里兜底补默认值，避免 400 "max_tokens: Field required"
+	// Bedrock 要求 max_tokens 必填：OpenAI 格式请求里该字段可选，转换后可能为 0 被 omitempty 丢弃，
+	// 这里兜底补默认值，避免 400 "max_tokens: Field required"。
 	if awsClaudeRequest.MaxTokens == 0 {
 		awsClaudeRequest.MaxTokens = 4096
 	}
 
-	for i := range awsClaudeRequest.Messages {
-		awsClaudeRequest.Messages[i].Content = removeCacheControl(awsClaudeRequest.Messages[i].Content)
+	// check header anthropic-beta
+	anthropicBetaValues := requestHeader.Get("anthropic-beta")
+	if len(anthropicBetaValues) > 0 {
+		var tempArray []string
+		tempArray = strings.Split(anthropicBetaValues, ",")
+		if len(tempArray) > 0 {
+			betaJson, err := json.Marshal(tempArray)
+			if err != nil {
+				return nil, err
+			}
+			awsClaudeRequest.AnthropicBeta = betaJson
+		}
 	}
-	if awsClaudeRequest.System != nil {
-		awsClaudeRequest.System = removeCacheControl(awsClaudeRequest.System)
-	}
-	awsClaudeRequest.AnthropicBeta = nil
+
+	// 给 system / 最后一条 message 末尾补 Bedrock prompt caching 标记。
+	ensureBedrockCacheMarkers(&awsClaudeRequest)
+
 	logger.LogJson(context.Background(), "json", awsClaudeRequest)
 	return &awsClaudeRequest, nil
 }
 
+// removeCacheControl is a no-op shim kept for source compatibility.
+// Bedrock supports cache_control, so we no longer strip it.
+func removeCacheControl(content any) any {
+	return content
+}
+
+// ensureBedrockCacheMarkers adds a Bedrock prompt caching marker at the end of
+// system and the last user message if the client did not already set one.
+// This lets OpenAI Chat traffic enjoy Bedrock prompt caching.
+//
+// Handles three possible shapes after JSON unmarshal:
+//   - []dto.ClaudeMediaMessage (typed, used right after ConvertOpenAIRequest)
+//   - []any (map[string]any elements, used after a round-trip through formatRequest)
+//   - string system content (skipped, no anchor available)
+func ensureBedrockCacheMarkers(req *AwsClaudeRequest) {
+	cacheCtrl := json.RawMessage(`{"type":"ephemeral"}`)
+
+	if req.System != nil {
+		switch v := req.System.(type) {
+		case []dto.ClaudeMediaMessage:
+			if len(v) > 0 && len(v[len(v)-1].CacheControl) == 0 {
+				v[len(v)-1].CacheControl = cacheCtrl
+				req.System = v
+			}
+		case []any:
+			if len(v) > 0 {
+				if m, ok := v[len(v)-1].(map[string]any); ok {
+					if _, hasCC := m["cache_control"]; !hasCC {
+						m["cache_control"] = map[string]any{"type": "ephemeral"}
+					}
+				}
+			}
+		}
+	}
+
+	if n := len(req.Messages); n > 0 {
+		last := req.Messages[n-1]
+		switch v := last.Content.(type) {
+		case []dto.ClaudeMediaMessage:
+			if len(v) > 0 && len(v[len(v)-1].CacheControl) == 0 {
+				v[len(v)-1].CacheControl = cacheCtrl
+				req.Messages[n-1].Content = v
+			}
+		case []any:
+			if len(v) > 0 {
+				if m, ok := v[len(v)-1].(map[string]any); ok {
+					if _, hasCC := m["cache_control"]; !hasCC {
+						m["cache_control"] = map[string]any{"type": "ephemeral"}
+					}
+				}
+			}
+		}
+	}
+}
+
+// NovaMessage Nova模型使用messages-v1格式
 type NovaMessage struct {
 	Role    string        `json:"role"`
 	Content []NovaContent `json:"content"`
@@ -99,10 +150,12 @@ func convertToNovaRequest(req *dto.GeneralOpenAIRequest) *NovaRequest {
 			Content: []NovaContent{{Text: msg.StringContent()}},
 		}
 	}
+
 	novaReq := &NovaRequest{
 		SchemaVersion: "messages-v1",
 		Messages:      novaMessages,
 	}
+
 	if (req.MaxTokens != nil && *req.MaxTokens != 0) || (req.Temperature != nil && *req.Temperature != 0) || (req.TopP != nil && *req.TopP != 0) || (req.TopK != nil && *req.TopK != 0) || req.Stop != nil {
 		novaReq.InferenceConfig = &NovaInferenceConfig{}
 		if req.MaxTokens != nil && *req.MaxTokens != 0 {
@@ -123,6 +176,7 @@ func convertToNovaRequest(req *dto.GeneralOpenAIRequest) *NovaRequest {
 			}
 		}
 	}
+
 	return novaReq
 }
 
@@ -130,6 +184,7 @@ func parseStopSequences(stop any) []string {
 	if stop == nil {
 		return nil
 	}
+
 	switch v := stop.(type) {
 	case string:
 		if v != "" {

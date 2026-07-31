@@ -146,12 +146,15 @@ func doAwsClientRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor,
 		if claudeReq.MaxTokens == nil {
 			claudeReq.MaxTokens = common.GetPointer[uint](4096)
 		}
-		for i := range claudeReq.Messages {
-			claudeReq.Messages[i].Content = removeCacheControl(claudeReq.Messages[i].Content)
+		// 给 system/messages 末尾补 Bedrock prompt caching 标记（如果 client 没传），
+		// 让 OpenAI Chat 入口也能利用 Bedrock 的 cache。
+		awsShim := &AwsClaudeRequest{
+			System:   claudeReq.System,
+			Messages: claudeReq.Messages,
 		}
-		if claudeReq.System != nil {
-			claudeReq.System = removeCacheControl(claudeReq.System)
-		}
+		ensureBedrockCacheMarkers(awsShim)
+		claudeReq.System = awsShim.System
+		claudeReq.Messages = awsShim.Messages
 		// dto.ClaudeRequest 没有 anthropic_version 字段（Bedrock 必需），
 		// 先 marshal 成 map 再注入 anthropic_version，确保 Bedrock 不会报 "anthropic_version: Field required"。
 		rawJSON, mErr0 := common.Marshal(claudeReq)
