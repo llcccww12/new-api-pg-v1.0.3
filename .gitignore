@@ -1,0 +1,21 @@
+# Local config and build artifacts
+.env
+.env.local
+*.log
+/bin/
+/logs/
+/data/
+/electron/
+/web/dist/
+
+# Backups
+*.bak
+*.rar
+*.zip
+*.tar.gz
+
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+.cursor/
